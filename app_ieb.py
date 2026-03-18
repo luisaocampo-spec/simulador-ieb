@@ -7,7 +7,6 @@ import os
 # 1. CONFIGURACIÓN Y ESTILOS
 st.set_page_config(page_title="Simulador Auditoría IEB", page_icon="🛸", layout="wide")
 
-# Estilos CSS
 st.markdown("""
     <style>
     .stRadio > label > div > p {
@@ -218,11 +217,11 @@ with col_main:
 with col_nav:
     st.markdown("### 🛠️ Guardar / Cargar")
     
-    # NUEVO SISTEMA WEB: Descargar archivo
+    # CORRECCIÓN PARA STREAMLIT CLOUD: Convertimos todo a tipos nativos de Python (str, bool, float)
     progreso_data = {
-        'results': st.session_state.results,
-        'user_choices': st.session_state.user_choices,
-        'total_elapsed': st.session_state.total_elapsed + (0 if st.session_state.is_paused else (time.time() - st.session_state.last_start_time))
+        'results': {str(k): bool(v) for k, v in st.session_state.results.items()},
+        'user_choices': {str(k): str(v) for k, v in st.session_state.user_choices.items()},
+        'total_elapsed': float(st.session_state.total_elapsed + (0 if st.session_state.is_paused else (time.time() - st.session_state.last_start_time)))
     }
     json_progreso = json.dumps(progreso_data)
     
@@ -234,7 +233,6 @@ with col_nav:
         use_container_width=True
     )
     
-    # NUEVO SISTEMA WEB: Subir archivo
     st.write("")
     archivo_subido = st.file_uploader("📂 Continuar intento anterior:", type=['json'])
     if archivo_subido is not None:
