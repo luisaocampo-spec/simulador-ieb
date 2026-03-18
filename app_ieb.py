@@ -3,36 +3,30 @@ import pandas as pd
 import time
 import json
 import os
-import re
 
 # 1. CONFIGURACIÓN Y ESTILOS
 st.set_page_config(page_title="Simulador Auditoría IEB", page_icon="🛸", layout="wide")
 
-# Estilos CSS: Letra extra grande para respuestas y preguntas, dejando el menú intacto
+# Estilos CSS
 st.markdown("""
     <style>
-    /* Aumentar la etiqueta principal del radio (Seleccione la respuesta...) */
     .stRadio > label > div > p {
         font-size: 22px !important;
         font-weight: bold !important;
         color: #333 !important;
         margin-bottom: 15px !important;
     }
-    /* Aumentar el tamaño del texto de cada OPCIÓN de respuesta */
     .stRadio p { 
         font-size: 22px !important; 
         line-height: 1.6 !important;
     }
-    /* Darle más espacio (aire) entre cada opción para que sea fácil hacer clic */
     div[role="radiogroup"] > label {
         padding-top: 10px !important;
         padding-bottom: 10px !important;
     }
-    /* Aumentar el tamaño de los mensajes de Correcto/Incorrecto */
     .stAlert p { 
         font-size: 22px !important; 
     }
-    /* Botón de Contestar más grande */
     .stButton button {
         padding: 10px 24px !important;
     }
@@ -88,30 +82,7 @@ if 'total_elapsed' not in st.session_state:
 if 'last_start_time' not in st.session_state:
     st.session_state.last_start_time = time.time()
 
-# 4. LÓGICA DE GUARDADO/CARGA JSON
-def guardar_progreso():
-    data = {
-        'results': st.session_state.results,
-        'user_choices': st.session_state.user_choices,
-        'total_elapsed': st.session_state.total_elapsed + (0 if st.session_state.is_paused else (time.time() - st.session_state.last_start_time))
-    }
-    with open('progreso.json', 'w') as f:
-        json.dump(data, f)
-    st.toast("💾 Progreso guardado con éxito")
-
-def cargar_progreso():
-    if os.path.exists('progreso.json'):
-        with open('progreso.json', 'r') as f:
-            data = json.load(f)
-        st.session_state.results = {int(k): v for k, v in data['results'].items()}
-        st.session_state.user_choices = {int(k): v for k, v in data['user_choices'].items()}
-        st.session_state.total_elapsed = data.get('total_elapsed', 0.0)
-        st.session_state.last_start_time = time.time()
-        st.toast("📂 Progreso cargado")
-    else:
-        st.toast("⚠️ No hay progreso guardado")
-
-# 5. FILTRADO DE DATOS
+# 4. FILTRADO DE DATOS
 if st.session_state.modo_repaso:
     falladas = [i for i, v in st.session_state.results.items() if not v]
     df_activo = df_completo.iloc[falladas].reset_index()
@@ -135,7 +106,7 @@ incorrectas = sum(1 for v in st.session_state.results.values() if v == False)
 respondidas = len(st.session_state.results)
 puntaje = (correctas / len(df_completo)) * 100 if len(df_completo) > 0 else 0
 
-# 6. INTERFAZ GRÁFICA
+# 5. INTERFAZ GRÁFICA
 col_main, col_nav = st.columns([3, 1], gap="large")
 
 with col_main:
@@ -170,7 +141,6 @@ with col_main:
         st.write(f"**Pregunta {st.session_state.index + 1} de {total_q_activo}** | 📊 Respondidas globales: {respondidas} / {len(df_completo)}")
         st.progress((st.session_state.index + 1) / total_q_activo)
         
-        # PREGUNTA EN TAMAÑO EXTRA GRANDE
         st.markdown(f"<div style='font-size: 28px; font-weight: bold; color: #1f77b4; line-height: 1.4; margin-bottom: 20px;'>{row['Pregunta']}</div>", unsafe_allow_html=True)
 
         opciones_map = {
@@ -184,7 +154,6 @@ with col_main:
         texto_correcto = opciones_map.get(col_correcta, "Opción no encontrada")
         ya_respondida = real_index in st.session_state.results
         
-        # CAJA CON SCROLL PARA LAS RESPUESTAS (Alto fijo de 450px)
         with st.container(height=450, border=True):
             seleccion = st.radio(
                 "Seleccione la respuesta correcta:",
@@ -194,9 +163,8 @@ with col_main:
                 key=f"radio_{real_index}"
             )
 
-        st.write("") # Espacio en blanco
+        st.write("")
 
-        # RESULTADOS
         if ya_respondida:
             eleccion_usuario = st.session_state.user_choices[real_index]
             es_correcta = st.session_state.results[real_index]
@@ -248,13 +216,38 @@ with col_main:
 
 # ================= ÁREA DE NAVEGACIÓN Y HERRAMIENTAS =================
 with col_nav:
-    st.markdown("### 🛠️ Herramientas")
+    st.markdown("### 🛠️ Guardar / Cargar")
     
-    c_btn1, c_btn2 = st.columns(2)
-    with c_btn1:
-        if st.button("💾 Guardar"): guardar_progreso()
-    with c_btn2:
-        if st.button("📂 Cargar"): cargar_progreso(); st.rerun()
+    # NUEVO SISTEMA WEB: Descargar archivo
+    progreso_data = {
+        'results': st.session_state.results,
+        'user_choices': st.session_state.user_choices,
+        'total_elapsed': st.session_state.total_elapsed + (0 if st.session_state.is_paused else (time.time() - st.session_state.last_start_time))
+    }
+    json_progreso = json.dumps(progreso_data)
+    
+    st.download_button(
+        label="💾 Descargar mi progreso",
+        data=json_progreso,
+        file_name="progreso_piloto_ieb.json",
+        mime="application/json",
+        use_container_width=True
+    )
+    
+    # NUEVO SISTEMA WEB: Subir archivo
+    st.write("")
+    archivo_subido = st.file_uploader("📂 Continuar intento anterior:", type=['json'])
+    if archivo_subido is not None:
+        if st.button("✅ Cargar este archivo", use_container_width=True):
+            try:
+                data = json.load(archivo_subido)
+                st.session_state.results = {int(k): v for k, v in data.get('results', {}).items()}
+                st.session_state.user_choices = {int(k): v for k, v in data.get('user_choices', {}).items()}
+                st.session_state.total_elapsed = data.get('total_elapsed', 0.0)
+                st.session_state.last_start_time = time.time()
+                st.rerun()
+            except Exception as e:
+                st.error("❌ El archivo no es válido.")
         
     st.markdown("---")
     
